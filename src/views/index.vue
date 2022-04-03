@@ -4,7 +4,7 @@
     <button class="bg-green p-6" @click="sayHello">
       Say Hello To Everyone
     </button>
-    <button @click="startLocalStream">Start Local Stream</button>
+    <button @click="startCall">Start Local Stream</button>
     <div class="flex w-full items-center justify-center">
       <span>Local</span>
       <video
@@ -27,7 +27,7 @@
 <script setup>
 import { useRTCPeerConnection } from "@/composables/rtcpeerconnection.js";
 import { useWebSocket } from "@/composables/websocket.js";
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 
 const { ws, sendData } = useWebSocket();
 const { pc } = useRTCPeerConnection();
@@ -67,6 +67,14 @@ pc.value.onicecandidate = function (event) {
     });
   }
 };
+remoteStream = new MediaStream();
+
+pc.value.ontrack = function (event) {
+  event.streams[0].getTracks().forEach((track) => {
+    remoteStream.addTrack(track);
+  });
+  remoteVideo.value.srcObject = remoteStream;
+};
 
 function sayHello() {
   const payload = {
@@ -76,55 +84,47 @@ function sayHello() {
   sendData(payload);
 }
 
+function startCall() {
+  createOffer();
+}
+
 async function startLocalStream() {
   localStream = await navigator.mediaDevices.getUserMedia({
     video: true,
     audio: true,
   });
-  remoteStream = new MediaStream();
 
   localStream.getTracks().forEach((track) => {
     pc.value.addTrack(track, localStream);
   });
 
-  pc.value.ontrack = function (event) {
-    event.streams[0].getTracks().forEach((track) => {
-      remoteStream.addTrack(track);
-    });
-  };
-
   localVideo.value.srcObject = localStream;
-  remoteVideo.value.srcObject = remoteStream;
-
-  createOffer();
 }
 
-function createOffer() {
-  pc.value.createOffer((offer) => {
-    const payload = {
-      type: "offer",
-      offer,
-    };
-    console.log(payload);
-    sendData(payload);
+async function createOffer() {
+  const offer = await pc.value.createOffer();
+  const payload = {
+    type: "offer",
+    offer,
+  };
+  console.log(payload);
+  sendData(payload);
 
-    pc.value.setLocalDescription(offer);
-  });
+  pc.value.setLocalDescription(offer);
 }
 
-function onOffer(offer) {
+async function onOffer(offer) {
   pc.value.setRemoteDescription(new RTCSessionDescription(offer));
 
-  pc.value.createAnswer((answer) => {
-    pc.value.setLocalDescription(answer);
+  const answer = await pc.value.createAnswer();
+  pc.value.setLocalDescription(answer);
 
-    const payload = {
-      type: "answer",
-      answer,
-    };
+  const payload = {
+    type: "answer",
+    answer,
+  };
 
-    sendData(payload);
-  });
+  sendData(payload);
 }
 
 function onAnswer(answer) {
@@ -134,4 +134,8 @@ function onAnswer(answer) {
 function onCandidate(candidate) {
   pc.value.addIceCandidate(new RTCIceCandidate(candidate));
 }
+
+onMounted(() => {
+  startLocalStream();
+});
 </script>
