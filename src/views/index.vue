@@ -1,10 +1,12 @@
 <template>
   <div class="w-full flex items-center justify-center">
     <span>WebRTC example project</span>
-    <button class="bg-green p-6" @click="sayHello">
-      Say Hello To Everyone
+    <button @click="toggleVideo">
+      {{ videoEnabled ? "Disable video" : "Enable video" }}
     </button>
-    <button @click="startCall">Start Local Stream</button>
+    <button @click="toggleAudio">
+      {{ audioEnabled ? "Disable audio" : "Enable audio" }}
+    </button>
     <div class="flex w-full items-center justify-center">
       <span>Local</span>
       <video ref="localVideo" class="w-1/2 h-1/2" autoplay playsinline></video>
@@ -17,13 +19,14 @@
 <script setup>
 import { useRTCPeerConnection } from "@/composables/rtcpeerconnection.js";
 import { useWebSocket } from "@/composables/websocket.js";
-import { computed } from "@vue/reactivity";
-import { nextTick, onMounted, ref, watch } from "vue";
+import { onMounted, ref } from "vue";
 
 const { ws, sendData } = useWebSocket();
 
 const localVideo = ref();
-const remoteVideos = ref([]);
+
+const videoEnabled = ref(false);
+const audioEnabled = ref(false);
 
 const videoEls = ref();
 
@@ -33,12 +36,31 @@ const you = ref();
 
 const pcs = ref([]);
 
-const localStream = async () => {
-  return await navigator.mediaDevices.getUserMedia({
-    video: true,
-    audio: true,
-  });
-};
+const localStream = ref();
+
+function toggleVideo() {
+  const stream = localStream.value;
+  const enabled = stream.getVideoTracks()[0].enabled;
+  if (enabled) {
+    stream.getVideoTracks()[0].enabled = false;
+    videoEnabled.value = false;
+  } else {
+    stream.getVideoTracks()[0].enabled = true;
+    videoEnabled.value = true;
+  }
+}
+
+function toggleAudio() {
+  const stream = localStream.value;
+  const enabled = stream.getAudioTracks()[0].enabled;
+  if (enabled) {
+    stream.getAudioTracks()[0].enabled = false;
+    audioEnabled.value = false;
+  } else {
+    stream.getAudioTracks()[0].enabled = true;
+    audioEnabled.value = true;
+  }
+}
 
 const msgs = ref([]);
 
@@ -152,14 +174,6 @@ function removePcs(client) {
   }
 }
 
-function sayHello() {
-  const payload = {
-    type: "message",
-    message: "Message",
-  };
-  sendData(payload);
-}
-
 async function startCall() {
   for (let i = 0; i < pcs.value.length; i++) {
     await addLocalStreamToAllPeerConnections(pcs.value[i].pc);
@@ -168,14 +182,14 @@ async function startCall() {
 }
 
 async function addLocalStreamToAllPeerConnections(pc) {
-  const stream = await localStream();
+  const stream = localStream.value;
   stream.getTracks().forEach((track) => {
     pc.addTrack(track, stream);
   });
 }
 
 async function startLocalStream() {
-  localVideo.value.srcObject = await localStream();
+  localVideo.value.srcObject = localStream.value;
 }
 
 async function createOffer(data) {
@@ -243,8 +257,18 @@ function getPC(arr, client) {
 }
 
 onMounted(() => {
-  startLocalStream().then(() => {
-    startCall();
-  });
+  navigator.mediaDevices
+    .getUserMedia({
+      video: true,
+      audio: true,
+    })
+    .then((stream) => {
+      localStream.value = stream;
+      videoEnabled.value = true;
+      audioEnabled.value = true;
+      startLocalStream().then(() => {
+        startCall();
+      });
+    });
 });
 </script>
