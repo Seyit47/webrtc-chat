@@ -5,8 +5,13 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      name: "HomeView",
-      component: () => import("../views/index.vue"),
+      name: "MeshVersionView",
+      component: () => import("../views/mesh-version.vue"),
+    },
+    {
+      path: "/sfu",
+      name: "SFUVersionView",
+      component: () => import("../views/sfu-version.vue"),
     },
   ],
 });
