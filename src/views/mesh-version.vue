@@ -1,22 +1,65 @@
 <template>
-  <div class="w-full flex items-center justify-center">
-    <span>WebRTC example project</span>
-    <button @click="toggleVideo">
-      {{ videoEnabled ? "Disable video" : "Enable video" }}
-    </button>
-    <button @click="toggleAudio">
-      {{ audioEnabled ? "Disable audio" : "Enable audio" }}
-    </button>
-    <div class="flex w-full items-center justify-center">
-      <span>Local</span>
-      <video ref="localVideo" class="w-1/2 h-1/2" autoplay playsinline></video>
-      <span>Remote</span>
-      <div ref="videoEls"></div>
+  <div
+    class="w-full min-h-screen flex items-center justify-center bg-custom-black"
+  >
+    <div
+      class="w-full flex flex-wrap items-center justify-center mb-[6vh]"
+      ref="videoEls"
+    >
+      <div class="mx-[1vw] my-[1vh] relative">
+        <video ref="localVideo" class="rounded-xl" autoplay playsinline></video>
+        <span
+          class="absolute bottom-[1vw] left-[1vw] text-white font-bold"
+          style="text-shadow: 2px 2px rgba(0, 0, 0, 0.4)"
+          >You</span
+        >
+      </div>
+    </div>
+    <div
+      class="
+        fixed
+        bottom-0
+        w-full
+        flex
+        items-center
+        justify-center
+        py-4
+        bg-custom-black
+      "
+    >
+      <span
+        ref="clock"
+        class="absolute text-white font-medium left-[2vw]"
+      ></span>
+      <button
+        class="bg-custom-gray rounded-full p-2 mr-4"
+        :style="{
+          'background-color': !audioEnabled ? 'rgb(239, 68, 68)' : '',
+        }"
+        @click="toggleAudio"
+      >
+        <IconMicrophone />
+      </button>
+      <button
+        class="rounded-full p-2 bg-custom-gray mr-4"
+        :style="{
+          'background-color': !videoEnabled ? 'rgb(239, 68, 68)' : '',
+        }"
+        @click="toggleVideo"
+      >
+        <IconCamera />
+      </button>
+      <button class="bg-red-500 rounded-full p-2" @click="closeWindow">
+        <IconPhone />
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
+import IconPhone from "@/components/icons/IconPhone.vue";
+import IconCamera from "@/components/icons/IconCamera.vue";
+import IconMicrophone from "@/components/icons/IconMicrophone.vue";
 import { useRTCPeerConnection } from "@/composables/rtcpeerconnection.js";
 import { useWebSocket } from "@/composables/websocket.js";
 import { onMounted, ref } from "vue";
@@ -35,8 +78,38 @@ const clients = ref([]);
 const you = ref();
 
 const pcs = ref([]);
+const clock = ref();
+
+const remoteVideos = ref([]);
 
 const localStream = ref();
+
+function setClock() {
+  var date = new Date();
+  var h = date.getHours();
+  var m = date.getMinutes();
+  var session = "AM";
+
+  if (h == 0) {
+    h = 12;
+  }
+
+  if (h > 12) {
+    h = h - 12;
+    session = "PM";
+  }
+
+  h = h < 10 ? "0" + h : h;
+  m = m < 10 ? "0" + m : m;
+
+  var time = h + ":" + m + " " + session;
+
+  clock.value.innerText = time;
+}
+
+function closeWindow() {
+  window.close();
+}
 
 function toggleVideo() {
   const stream = localStream.value;
@@ -44,9 +117,19 @@ function toggleVideo() {
   if (enabled) {
     stream.getVideoTracks()[0].enabled = false;
     videoEnabled.value = false;
+    sendData({
+      type: "video-toggle",
+      data: false,
+      client: you.value,
+    });
   } else {
     stream.getVideoTracks()[0].enabled = true;
     videoEnabled.value = true;
+    sendData({
+      type: "video-toggle",
+      data: true,
+      client: you.value,
+    });
   }
 }
 
@@ -82,6 +165,8 @@ ws.value.onmessage = function (data) {
   if (payload.type === "metadata") {
     you.value = payload.client;
   }
+  if (payload.type === "video-toggle") {
+  }
   if (payload.type === "new-client") {
     let pushed = false;
     if (clients.value.length === 0) {
@@ -105,6 +190,8 @@ ws.value.onmessage = function (data) {
       clients.value.splice(index, 1);
       removePcs(payload.client);
     }
+    const el = document.querySelector(`.index-${payload.client.id}`);
+    videoEls.value.removeChild(el);
   }
 };
 
@@ -143,15 +230,32 @@ function setPcs(client) {
   pc.value.ontrack = function (event) {
     if (!tracked) {
       const stream = new MediaStream();
+      let count = pcs.value.length + 1;
       if (event.streams[0]) {
         event.streams[0].getTracks().forEach((track) => {
           stream.addTrack(track);
         });
       }
+      if (count > 4) {
+        count = 4;
+      }
+      const con = 100 / count - 2;
+      pcs.value.forEach((peer) => {
+        if (client.id !== peer.client.id) {
+          const el = document.querySelector(`.index-${peer.client.id}`);
+          if (el) {
+            el.style.width = con + "vw";
+          }
+        }
+      });
+
+      localVideo.value.style.width = con + "vw";
       const el = document.createElement("video");
+      el.style.width = con + "vw";
       el.classList.add(`index-${client.id}`);
-      el.style.width = "100%";
-      el.style.height = "100%";
+      el.classList.add("rounded-xl");
+      el.classList.add("mx-[1vw]");
+      el.classList.add("my-[1vh]");
       el.playsInline = true;
       el.autoplay = true;
       el.srcObject = stream;
@@ -171,6 +275,17 @@ function removePcs(client) {
   if (index >= 0) {
     pcs.value[index].pc.close();
     pcs.value.splice(index, 1);
+    let count = pcs.value.length + 1;
+    const con = 100 / count - 2;
+    pcs.value.forEach((peer) => {
+      if (client.id !== peer.client.id) {
+        const el = document.querySelector(`.index-${peer.client.id}`);
+        if (el) {
+          el.style.width = con + "vw";
+        }
+      }
+    });
+    localVideo.value.style.width = con + "vw";
   }
 }
 
@@ -257,6 +372,8 @@ function getPC(arr, client) {
 }
 
 onMounted(() => {
+  setClock();
+  setInterval(setClock, 1000);
   navigator.mediaDevices
     .getUserMedia({
       video: true,
