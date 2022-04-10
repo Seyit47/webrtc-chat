@@ -117,19 +117,9 @@ function toggleVideo() {
   if (enabled) {
     stream.getVideoTracks()[0].enabled = false;
     videoEnabled.value = false;
-    sendData({
-      type: "video-toggle",
-      data: false,
-      client: you.value,
-    });
   } else {
     stream.getVideoTracks()[0].enabled = true;
     videoEnabled.value = true;
-    sendData({
-      type: "video-toggle",
-      data: true,
-      client: you.value,
-    });
   }
 }
 
@@ -276,16 +266,20 @@ function removePcs(client) {
     pcs.value[index].pc.close();
     pcs.value.splice(index, 1);
     let count = pcs.value.length + 1;
-    const con = 100 / count - 2;
-    pcs.value.forEach((peer) => {
-      if (client.id !== peer.client.id) {
-        const el = document.querySelector(`.index-${peer.client.id}`);
-        if (el) {
-          el.style.width = con + "vw";
+    if (count === 1) {
+      localVideo.value.style.width = "auto";
+    } else {
+      const con = 100 / count - 2;
+      pcs.value.forEach((peer) => {
+        if (client.id !== peer.client.id) {
+          const el = document.querySelector(`.index-${peer.client.id}`);
+          if (el) {
+            el.style.width = con + "vw";
+          }
         }
-      }
-    });
-    localVideo.value.style.width = con + "vw";
+      });
+      localVideo.value.style.width = con + "vw";
+    }
   }
 }
 
