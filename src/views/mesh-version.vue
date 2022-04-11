@@ -53,6 +53,7 @@
         <IconPhone />
       </button>
     </div>
+    <IconDisabledMicrophone class="hidden" id="icon" />
   </div>
 </template>
 
@@ -60,6 +61,7 @@
 import IconPhone from "@/components/icons/IconPhone.vue";
 import IconCamera from "@/components/icons/IconCamera.vue";
 import IconMicrophone from "@/components/icons/IconMicrophone.vue";
+import IconDisabledMicrophone from "@/components/icons/IconDisabledMicrophone.vue";
 import { useRTCPeerConnection } from "@/composables/rtcpeerconnection.js";
 import { useWebSocket } from "@/composables/websocket.js";
 import { onMounted, ref } from "vue";
@@ -79,8 +81,6 @@ const you = ref();
 
 const pcs = ref([]);
 const clock = ref();
-
-const remoteVideos = ref([]);
 
 const localStream = ref();
 
@@ -129,9 +129,19 @@ function toggleAudio() {
   if (enabled) {
     stream.getAudioTracks()[0].enabled = false;
     audioEnabled.value = false;
+    sendData({
+      type: "audio-toggle",
+      data: false,
+      client: you.value,
+    });
   } else {
     stream.getAudioTracks()[0].enabled = true;
     audioEnabled.value = true;
+    sendData({
+      type: "audio-toggle",
+      data: true,
+      client: you.value,
+    });
   }
 }
 
@@ -155,7 +165,15 @@ ws.value.onmessage = function (data) {
   if (payload.type === "metadata") {
     you.value = payload.client;
   }
-  if (payload.type === "video-toggle") {
+  if (payload.type === "audio-toggle") {
+    const icon = document.querySelector(`.icon-${payload.client.id}`);
+    if (icon) {
+      if (payload.data) {
+        icon.classList.add("hidden");
+      } else {
+        icon.classList.remove("hidden");
+      }
+    }
   }
   if (payload.type === "new-client") {
     let pushed = false;
@@ -240,16 +258,25 @@ function setPcs(client) {
       });
 
       localVideo.value.style.width = con + "vw";
+      const div = document.createElement("div");
+      div.classList.add(`index-${client.id}`);
       const el = document.createElement("video");
       el.style.width = con + "vw";
-      el.classList.add(`index-${client.id}`);
       el.classList.add("rounded-xl");
-      el.classList.add("mx-[1vw]");
-      el.classList.add("my-[1vh]");
+      div.classList.add("mx-[1vw]");
+      div.classList.add("my-[1vh]");
+      div.classList.add("relative");
+      const icon = document.getElementById("icon");
+      icon.classList.add("absolute");
+      icon.classList.add("top-[1vw]");
+      icon.classList.add("right-[1vw]");
+      icon.classList.add(`icon-${client.id}`);
       el.playsInline = true;
       el.autoplay = true;
       el.srcObject = stream;
-      videoEls.value.appendChild(el);
+      div.appendChild(el);
+      div.appendChild(icon);
+      videoEls.value.appendChild(div);
       tracked = true;
     }
   };

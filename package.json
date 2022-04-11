@@ -9,6 +9,8 @@
     "format": "prettier .  --write"
   },
   "dependencies": {
+    "@vueuse/core": "^8.2.5",
+    "pinia": "^2.0.13",
     "vue": "^3.2.16",
     "vue-router": "^4.0.14"
   },

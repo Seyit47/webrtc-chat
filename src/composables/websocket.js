@@ -24,8 +24,8 @@ export function useWebSocket() {
     };
   }
 
-  function sendData(payload) {
-    ws.value.send(JSON.stringify(payload));
+  async function sendData(payload) {
+    await ws.value.send(JSON.stringify(payload));
   }
 
   ws.value.onopen = function () {
